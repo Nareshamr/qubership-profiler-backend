@@ -240,6 +240,40 @@ func (suite *PackTaskTestSuite) TestProcessingZippingStatusWithExistArchive() {
 	require.Equal(t, 8, len(zipFiles))
 }
 
+// TestPackTaskOnlyArchivesTimelinesBeforeArchiveCutoff verifies that the pack task
+// only archives timelines with TsHour strictly before the given cutoff (tBefore).
+// This implements the DIAG_PV_HOURS_ARCHIVE_AFTER behaviour: in run.go the pack task
+// is invoked with tBefore = Now - ArchiveHours hours, so only dumps older than that are zipped.
+func (suite *PackTaskTestSuite) TestPackTaskOnlyArchivesTimelinesBeforeArchiveCutoff() {
+	t := suite.T()
+
+	packTask, err := task.NewPackTask(helpers.TestBaseDir, suite.db)
+	require.NoError(t, err)
+	require.NotNil(t, packTask)
+
+	// Timeline in test data is 2024-07-31 23:00
+	hour23 := time.Date(2024, 7, 31, 23, 0, 0, 0, time.UTC)
+	_, _, err = suite.db.CreateTimelineIfNotExist(suite.ctx, hour23)
+	require.NoError(t, err)
+
+	// Cutoff before 23:00: no timelines should be packed (archive cutoff is "before" this time)
+	cutoffBeforeData := time.Date(2024, 7, 31, 22, 0, 0, 0, time.UTC)
+	err = packTask.Execute(suite.ctx, cutoffBeforeData)
+	require.NoError(t, err)
+
+	dayDir := filepath.Join(helpers.TestBaseDir, "test-namespace-1", "2024", "07", "31")
+	_, err = os.Stat(filepath.Join(dayDir, "23.zip"))
+	require.True(t, os.IsNotExist(err), "23.zip should not exist when cutoff is before 23:00")
+
+	// Cutoff after 23:00: timeline 23 should be packed (like DIAG_PV_HOURS_ARCHIVE_AFTER hours ago)
+	cutoffAfterData := time.Date(2024, 8, 1, 0, 0, 0, 0, time.UTC)
+	err = packTask.Execute(suite.ctx, cutoffAfterData)
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(dayDir, "23.zip"))
+	require.NoError(t, err, "23.zip should exist after cutoff past 23:00")
+}
+
 // TestProcessingUnexpectedStatus verifies that the pack task skips processing
 // timelines with statuses other than RawStatus or ZippingStatus.
 func (suite *PackTaskTestSuite) TestProcessingUnexpectedStatus() {

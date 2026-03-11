@@ -67,8 +67,39 @@ func (suite *RemoveTaskTestSuite) TestWrongParameters() {
 	require.NotNil(t, removeTask)
 }
 
+// TestRemoveTaskRespectsDeleteDaysCutoff verifies that the remove task only deletes
+// timelines (dumps and gc files) with TsHour strictly before the given cutoff (tBefore).
+// This implements DIAG_PV_DAYS_DELETE_AFTER: in run.go the remove task is invoked with
+// tBefore = Now - DeleteDays days, so only data older than that is removed from PV and DB.
+func (suite *RemoveTaskTestSuite) TestRemoveTaskRespectsDeleteDaysCutoff() {
+	t := suite.T()
+
+	rescanTask, err := task.NewRescanTask(helpers.TestBaseDir, suite.db)
+	require.NoError(t, err)
+	require.NoError(t, rescanTask.Execute(suite.ctx))
+
+	removeTask, err := task.NewRemoveTask(helpers.TestBaseDir, suite.db)
+	require.NoError(t, err)
+
+	// Cutoff at 2024-07-31 23:00: everything before that hour is removed; 2024-08 stays
+	err = removeTask.Execute(suite.ctx, time.Date(2024, 7, 31, 23, 0, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	yearDir := filepath.Join(helpers.TestBaseDir, "test-namespace-1", "2024")
+	entries, err := os.ReadDir(yearDir)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, "08", entries[0].Name(), "only 2024-08 should remain after delete cutoff at 2024-07-31 23:00")
+
+	timelines, err := suite.db.SearchTimelines(suite.ctx, time.Time{}, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(timelines))
+	require.True(t, timelines[0].TsHour.After(time.Date(2024, 7, 31, 23, 0, 0, 0, time.UTC)))
+}
+
 // TestFullRun verifies the full execution flow of a remove task.
 // It first runs RescanTask to populate the database, then RemoveTask with a cutoff at 2024-07-31 23:00.
+// This corresponds to DIAG_PV_DAYS_DELETE_AFTER: only dumps and gc files older than the cutoff are removed from PV.
 // It checks that:
 //   - only the 2024-08 directory remains in PV
 //   - only 1 timeline (2024-08-01 00:00) remains in the database

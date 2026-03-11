@@ -12,7 +12,7 @@ type Config struct {
 	// PV params
 	PVMountPath string `envconfig:"DIAG_PV_MOUNT_PATH"`
 
-	// DB params
+	// DB params (PG params: DIAG_POSTGRES_HOST, DIAG_POSTGRES_PORT, DIAG_POSTGRES_USERNAME, DIAG_POSTGRES_PASSWORD, DIAG_DB_NAME)
 	DBHost           string `envconfig:"DIAG_POSTGRES_HOST" default:"localhost"`
 	DBPort           int    `envconfig:"DIAG_POSTGRES_PORT" default:"5432"`
 	DBUser           string `envconfig:"DIAG_POSTGRES_USERNAME" default:"postgres"`
@@ -35,6 +35,19 @@ func (c *Config) GetPathToDB() string {
 
 func (c *Config) GetBasePVDir() string {
 	return filepath.Join(c.PVMountPath, "diagnostic")
+}
+
+// PostgresParamNames returns the env var names for Postgres connection.
+// When deploying the Dockerfile.scripts image, the deployment must not require these params
+// (irrespective of PVMountPath). Used by charts/tests to ensure scripts image deploys without PG.
+func PostgresParamNames() []string {
+	return []string{
+		"DIAG_POSTGRES_HOST",
+		"DIAG_POSTGRES_PORT",
+		"DIAG_POSTGRES_USERNAME",
+		"DIAG_POSTGRES_PASSWORD",
+		"DIAG_DB_NAME",
+	}
 }
 
 var EnvConfig Config
