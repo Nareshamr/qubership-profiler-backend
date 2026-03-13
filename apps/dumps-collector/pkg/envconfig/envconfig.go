@@ -37,6 +37,19 @@ func (c *Config) GetBasePVDir() string {
 	return filepath.Join(c.PVMountPath, "diagnostic")
 }
 
+// PostgresParamNames returns the env var names for Postgres connection.
+// When deploying the Dockerfile.scripts image, the deployment must not require these params.
+// Used by charts/tests to ensure the scripts image deploys without PG.
+func PostgresParamNames() []string {
+	return []string{
+		"DIAG_POSTGRES_HOST",
+		"DIAG_POSTGRES_PORT",
+		"DIAG_POSTGRES_USERNAME",
+		"DIAG_POSTGRES_PASSWORD",
+		"DIAG_DB_NAME",
+	}
+}
+
 var EnvConfig Config
 
 func InitConfig() error {
