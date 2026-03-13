@@ -1,5 +1,5 @@
 # Build context: repository root
-# Scripts image: Nginx + WebDAV + cleanup. Receives dumps from agents and stores on PV (no Go server, no Postgres).
+# Scripts image: Nginx + WebDAV. Receives dumps from agents and stores on PV (no Go server, no Postgres).
 # Usage: docker build -f apps/dumps-collector/Dockerfile.scripts -t qubership-profiler-dumps-collector-scripts .
 # Set DIAG_PV_MOUNT_PATH (e.g. /diag) to receive uploads and store on PV.
 
@@ -55,8 +55,6 @@ COPY apps/dumps-collector/static/index.html ${DIAGNOSTIC_TOOLS_LOCATION}/index.h
 COPY apps/dumps-collector/src/nginx/nginx.conf /scripts/nginx/
 COPY apps/dumps-collector/src/nginx/nginx-https.conf /scripts/nginx/
 COPY apps/dumps-collector/src/nginx/entrypoint.sh /scripts/
-COPY apps/dumps-collector/scripts/cleanup.sh /scripts/
-COPY apps/dumps-collector/scripts/cleanup-namespace.sh /scripts/
 
 RUN chown -R ${USER_UID} /scripts/ \
     && chmod -R a+rx /scripts/ \
@@ -76,5 +74,5 @@ USER ${USER_UID}
 
 EXPOSE 8080
 
-# Receives dumps via WebDAV at /diagnostic when DIAG_PV_MOUNT_PATH is set; runs PV cleanup.
+# Receives dumps via WebDAV at /diagnostic when DIAG_PV_MOUNT_PATH is set;
 CMD ["/scripts/entrypoint.sh"]
